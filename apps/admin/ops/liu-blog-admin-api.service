@@ -1,0 +1,26 @@
+[Unit]
+Description=Xinghui Blog server administration API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blog
+Group=blog
+WorkingDirectory=/srv/xinghui-blog-admin/source
+Environment=PYTHONUTF8=1
+Environment=PYTHONIOENCODING=utf-8
+Environment=XINGHUI_BLOG_DEPLOY_STATE=/var/lib/xinghui-blog-admin/deploy-state.json
+Environment=XINGHUI_BLOG_PUBLISH_SERVICE=xinghui-blog-publish.service
+ExecStart=/srv/xinghui-blog-admin/venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 58643 --workers 1 --timeout-graceful-shutdown 3
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+MemoryMax=320M
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/xinghui-blog-admin /srv/xinghui-blog/workspace /var/lib/xinghui-blog-admin
+
+[Install]
+WantedBy=multi-user.target

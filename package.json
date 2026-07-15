@@ -1,0 +1,14 @@
+{
+  "name": "liu-blog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A full-stack personal blog with a Next.js public site and a FastAPI-powered CMS.",
+  "scripts": {
+    "setup:web": "npm ci --prefix apps/web",
+    "setup:admin": "npm ci --prefix apps/admin",
+    "dev:web": "npm run dev --prefix apps/web",
+    "dev:admin": "npm run dev --prefix apps/admin",
+    "build:web": "npm run build --prefix apps/web",
+    "build:admin": "npm run build --prefix apps/admin"
+  }
+}

@@ -1,0 +1,41 @@
+# JavaScript
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Runtime data and secrets
+.env
+.env.*
+!.env.example
+runtime-logs/
+*.log
+data/visits.json
+apps/*/data/.deepseek_api_key
+apps/admin/data/music-library.json
+apps/admin/data/music-playlist-cache.json
+apps/admin/data/music-pair-sessions.json
+apps/admin/data/deploy-state.json
+apps/admin/data/drafts.json
+apps/admin/data/cookies.json
+*.pem
+*.key
+*.p12
+
+# Generated applications
+apps/admin/tools/qq-login-helper/dist/
+apps/admin/tools/qq-login-helper/node_modules/
+apps/admin/public/downloads/*.exe
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

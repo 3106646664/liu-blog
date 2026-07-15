@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly ADMIN_DIR="/srv/liu-blog-admin"
+readonly SOURCE_DIR="${ADMIN_DIR}/source"
+readonly VENV_DIR="${ADMIN_DIR}/venv"
+
+export NEXT_TELEMETRY_DISABLED=1
+export NODE_OPTIONS="--max-old-space-size=700"
+export CI=1
+
+if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
+  /usr/bin/python3 -m venv "${VENV_DIR}"
+fi
+"${VENV_DIR}/bin/pip" install --disable-pip-version-check -r "${SOURCE_DIR}/requirements-server.txt"
+
+cd "${SOURCE_DIR}"
+npm ci --no-audit --no-fund
+rm -rf .next
+npm run build
+
+mkdir -p .next/standalone/.next
+rm -rf .next/standalone/.next/static
+cp -a .next/static .next/standalone/.next/static
+rm -rf .next/standalone/public
+cp -a public .next/standalone/public
+
+printf 'LIU Blog admin bootstrap completed.\n'

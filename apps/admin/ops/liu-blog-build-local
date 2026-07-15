@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly BASE_DIR="/srv/liu-blog"
+readonly WORKSPACE_DIR="${BASE_DIR}/workspace"
+readonly BUILD_DIR="${BASE_DIR}/build"
+readonly RELEASES_DIR="${BASE_DIR}/releases"
+readonly STATE_DIR="/var/lib/liu-blog-admin"
+readonly STATE_TOOL="/usr/local/libexec/liu-blog-state"
+readonly LOCK_FILE="${STATE_DIR}/publish.lock"
+
+export NEXT_TELEMETRY_DISABLED=1
+export NODE_OPTIONS="--max-old-space-size=700"
+export CI=1
+
+release_id=""
+preview_pid=""
+
+state() {
+  "${STATE_TOOL}" "$1" "$2" "$3" "${4:-${release_id}}"
+}
+
+cleanup() {
+  if [[ -n "${preview_pid}" ]] && kill -0 "${preview_pid}" 2>/dev/null; then
+    kill "${preview_pid}" 2>/dev/null || true
+    wait "${preview_pid}" 2>/dev/null || true
+  fi
+}
+
+failed() {
+  local status=$?
+  cleanup
+  state failed 0 "主站构建失败，仍在使用上一个可用版本。请查看服务器构建日志。"
+  exit "${status}"
+}
+
+terminated() {
+  cleanup
+  state failed 0 "主站构建被服务器中断，工作区锁已自动解除。"
+  exit 143
+}
+
+trap cleanup EXIT
+trap failed ERR
+trap terminated TERM INT
+
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  state failed 0 "已有另一项主站构建正在运行。"
+  exit 75
+fi
+
+state preparing 8 "已获取服务器构建锁，正在检查工作区。"
+test -f "${WORKSPACE_DIR}/package.json"
+mkdir -p "${BUILD_DIR}" "${RELEASES_DIR}" "${STATE_DIR}"
+
+state snapshotting 16 "正在保存服务器本地版本快照。"
+cd "${WORKSPACE_DIR}"
+if [[ ! -d .git ]]; then
+  git init -q
+  git config user.name "LIU Blog Server CMS"
+  git config user.email "server-cms@example.com"
+fi
+git add -A
+if ! git diff --cached --quiet; then
+  git commit -q -m "Publish from server CMS $(date --iso-8601=seconds)"
+fi
+revision="$(git rev-parse --short HEAD)"
+release_id="local-$(date +%Y%m%d-%H%M%S)-${revision}"
+
+state preparing 24 "正在准备隔离构建目录。" "${release_id}"
+rsync -a --delete \
+  --exclude='.git' \
+  --exclude='.next' \
+  --exclude='node_modules' \
+  --exclude='.node-modules-lock-hash' \
+  --exclude='runtime-logs' \
+  "${WORKSPACE_DIR}/" "${BUILD_DIR}/"
+
+cd "${BUILD_DIR}"
+lock_hash="$(sha256sum package-lock.json | awk '{print $1}')"
+installed_hash="$(cat .node-modules-lock-hash 2>/dev/null || true)"
+if [[ ! -d node_modules ]] || [[ "${lock_hash}" != "${installed_hash}" ]]; then
+  state installing 34 "依赖清单有变化，正在安装构建依赖。" "${release_id}"
+  rm -rf node_modules
+  npm ci --no-audit --no-fund
+  printf '%s\n' "${lock_hash}" > .node-modules-lock-hash
+fi
+
+state building 48 "Next.js 正在编译和生成页面。" "${release_id}"
+npm run build
+
+release_dir="${RELEASES_DIR}/${release_id}"
+runtime_dir="${release_dir}/runtime"
+rm -rf -- "${release_dir}"
+mkdir -p "${release_dir}"
+cp -a .next/standalone "${runtime_dir}"
+mkdir -p "${runtime_dir}/.next"
+rm -rf -- "${runtime_dir}/.next/static"
+cp -a .next/static "${runtime_dir}/.next/static"
+if [[ -d public ]]; then
+  rm -rf -- "${runtime_dir}/public"
+  cp -a public "${runtime_dir}/public"
+fi
+printf '%s\n' "${release_id}" > "${runtime_dir}/.release"
+
+state checking 82 "构建完成，正在隔离端口执行健康检查。" "${release_id}"
+(
+  cd "${runtime_dir}"
+  HOSTNAME=127.0.0.1 PORT=3099 NODE_ENV=production /usr/bin/node server.js \
+    >"${STATE_DIR}/preview.log" 2>&1
+) &
+preview_pid=$!
+healthy=0
+for _ in $(seq 1 40); do
+  if curl --silent --fail --max-time 2 http://127.0.0.1:3099/ >/dev/null; then
+    healthy=1
+    break
+  fi
+  sleep 0.5
+done
+if [[ "${healthy}" -ne 1 ]]; then
+  exit 70
+fi
+cleanup
+preview_pid=""
+
+state switching 94 "健康检查通过，正在原子切换主站版本。" "${release_id}"
+readlink -f "${BASE_DIR}/current" > "${STATE_DIR}/previous-target" 2>/dev/null || true
+rm -f -- "${BASE_DIR}/current.next"
+ln -s "${runtime_dir}" "${BASE_DIR}/current.next"
+mv -Tf "${BASE_DIR}/current.next" "${BASE_DIR}/current"
+printf '%s\n' "${release_id}" > "${STATE_DIR}/last-release"
+
+mapfile -t local_releases < <(
+  find "${RELEASES_DIR}" -mindepth 1 -maxdepth 1 -type d -name 'local-*' -printf '%T@ %p\n' \
+    | sort -nr | sed 's/^[^ ]* //'
+)
+for ((index = 5; index < ${#local_releases[@]}; index++)); do
+  old_release="$(realpath "${local_releases[index]}")"
+  if [[ "${old_release}" == "${RELEASES_DIR}/local-"* ]]; then
+    rm -rf -- "${old_release}"
+  fi
+done
+
+trap - ERR
+exit 0

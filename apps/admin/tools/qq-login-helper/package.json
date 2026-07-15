@@ -1,0 +1,30 @@
+{
+  "name": "xinghui-blog-qq-login-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Xinghui Blog QQ Music official login and secure pairing helper",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^37.2.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.example.xinghuiblog.qqlogin",
+    "productName": "Xinghui Blog QQ Login Helper",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js"
+    ],
+    "win": {
+      "target": ["portable"],
+      "artifactName": "LIU-Blog-QQ-Login-Helper.exe"
+    }
+  }
+}

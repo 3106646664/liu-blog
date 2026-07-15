@@ -1,0 +1,15 @@
+[Unit]
+Description=Publish Xinghui Blog from the server-local CMS workspace
+After=network-online.target xinghui-blog-admin-api.service
+Wants=network-online.target
+Conflicts=xinghui-blog-update.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/xinghui-blog-publish
+TimeoutStartSec=15min
+MemoryMax=1200M
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+{
+  "blogPath": "C:\\path\\to\\liu-blog\\apps\\web",
+  "sourceRepoUrl": "git@github.com:YOUR_GITHUB_NAME/liu-blog.git",
+  "sourceBranch": "main",
+  "serverHost": "203.0.113.10",
+  "serverUser": "root",
+  "serverKeyPath": "C:\\path\\to\\id_ed25519",
+  "serverUpdateService": "xinghui-blog-update.service"
+}

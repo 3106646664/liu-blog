@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xinghui Blog QQ 音乐登录助手</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: #e2e8f0; background: radial-gradient(circle at 20% 10%, #312e81 0, #0f172a 42%, #020617 100%); font-family: "Microsoft YaHei UI", system-ui, sans-serif; }
+    main { max-width: 560px; margin: 0 auto; padding: 44px 32px; }
+    .badge { display: inline-flex; padding: 6px 10px; border-radius: 999px; color: #a5b4fc; background: rgba(99,102,241,.14); font-size: 12px; font-weight: 800; }
+    h1 { margin: 18px 0 8px; font-size: 25px; }
+    .lead { margin: 0 0 28px; color: #94a3b8; font-size: 13px; line-height: 1.8; }
+    .card { padding: 22px; border: 1px solid rgba(148,163,184,.18); border-radius: 24px; background: rgba(15,23,42,.76); box-shadow: 0 28px 70px rgba(0,0,0,.35); }
+    label { display: block; margin-bottom: 9px; color: #cbd5e1; font-size: 12px; font-weight: 800; }
+    input { width: 100%; padding: 14px 15px; border: 1px solid #334155; border-radius: 14px; outline: 0; color: #f8fafc; background: #020617; font: 13px ui-monospace, Consolas, monospace; }
+    input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.15); }
+    .actions { display: flex; gap: 10px; margin-top: 14px; }
+    button { border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; font-weight: 900; }
+    #start { flex: 1; color: white; background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+    #clear { color: #cbd5e1; background: #1e293b; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { margin-top: 18px; padding: 13px 15px; border-radius: 14px; color: #a5b4fc; background: rgba(99,102,241,.1); font-size: 12px; line-height: 1.7; }
+    #status.success { color: #6ee7b7; background: rgba(16,185,129,.1); }
+    #status.error { color: #fca5a5; background: rgba(239,68,68,.1); }
+    .notes { margin: 22px 2px 0; color: #64748b; font-size: 11px; line-height: 1.9; }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="badge">仅供 Xinghui Blog 管理员使用</span>
+    <h1>QQ 音乐官方登录助手</h1>
+    <p class="lead">助手只在本机打开 QQ 音乐官方页面。登录成功后，播放票据会通过 HTTPS 和一次性配对码同步到你的博客服务器。</p>
+    <section class="card">
+      <label for="token">后台一次性配对码</label>
+      <input id="token" autocomplete="off" spellcheck="false" placeholder="从 admin.example.com 后台复制并粘贴" />
+      <div class="actions"><button id="start">打开 QQ 音乐并登录</button><button id="clear">清除本机登录</button></div>
+      <div id="status">等待输入配对码。</div>
+    </section>
+    <p class="notes">配对码有效期为 10 分钟且只能使用一次。不要把配对码或 QQ 音乐 Cookie 发给其他人。</p>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

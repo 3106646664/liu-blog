@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 360">
+  <defs>
+    <g id="bot">
+      <rect x="22" y="30" width="76" height="70" rx="20" fill="#6d28d9"/>
+      <rect x="30" y="38" width="60" height="46" rx="14" fill="#ede9fe"/>
+      <rect x="41" y="53" width="10" height="14" rx="5" fill="#4c1d95"/>
+      <rect x="69" y="53" width="10" height="14" rx="5" fill="#4c1d95"/>
+      <path d="M48 74c8 7 16 7 24 0" fill="none" stroke="#ec4899" stroke-width="4" stroke-linecap="round"/>
+      <path d="M60 30V17" stroke="#6d28d9" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="60" cy="13" r="6" fill="#f472b6"/>
+      <rect x="38" y="96" width="44" height="16" rx="8" fill="#8b5cf6"/>
+    </g>
+  </defs>
+  <use href="#bot" x="0" y="0"/><use href="#bot" x="120" y="0"/><use href="#bot" x="240" y="0"/>
+  <use href="#bot" x="0" y="120"/><use href="#bot" x="120" y="120"/><use href="#bot" x="240" y="120"/>
+  <use href="#bot" x="0" y="240"/><use href="#bot" x="120" y="240"/><use href="#bot" x="240" y="240"/>
+</svg>

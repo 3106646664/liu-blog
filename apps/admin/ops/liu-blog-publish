@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly STATE_TOOL="/usr/local/libexec/liu-blog-state"
+readonly STATE_DIR="/var/lib/liu-blog-admin"
+readonly BUILD_TOOL="/usr/local/libexec/liu-blog-build-local"
+
+set +e
+runuser -u blog -- "${BUILD_TOOL}"
+status=$?
+set -e
+
+if [[ "${status}" -ne 0 ]]; then
+  echo "LIU Blog local publish failed with status ${status}." >&2
+  exit "${status}"
+fi
+
+release="$(cat "${STATE_DIR}/last-release")"
+if systemctl restart liu-blog.service && \
+   curl --silent --fail --retry 20 --retry-delay 1 --retry-connrefused \
+     --max-time 3 http://127.0.0.1:3000/ >/dev/null; then
+  runuser -u blog -- "${STATE_TOOL}" success 100 "主站已完成构建并切换到新版本。" "${release}"
+  exit 0
+fi
+
+previous="$(cat "${STATE_DIR}/previous-target" 2>/dev/null || true)"
+if [[ -n "${previous}" ]] && [[ -d "${previous}" ]]; then
+  rm -f /srv/liu-blog/current.next
+  ln -s "${previous}" /srv/liu-blog/current.next
+  mv -Tf /srv/liu-blog/current.next /srv/liu-blog/current
+  systemctl restart liu-blog.service || true
+fi
+runuser -u blog -- "${STATE_TOOL}" failed 0 "新版本启动失败，主站已回退到上一个可用版本。" "${release}"
+exit 71
