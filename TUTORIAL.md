@@ -39,7 +39,7 @@ pip install -r apps/admin/requirements-server.txt
 - 标题、作者名、简介和社交链接；
 - `public/avatar.svg`、`public/placeholder.svg` 和 `public/pet.svg`；
 - 背景模式、弹幕、页脚和备案信息；
-- Gitalk、图床、AI 和音乐设置。
+- 自有账号评论、图床、AI 和音乐设置。
 
 不要把 DeepSeek Key、图床 Token、GitHub 私钥或音乐 Cookie 写入 `siteConfig.ts`。
 
@@ -87,17 +87,32 @@ sudo install -m 600 -o blog -g blog /dev/null /srv/xinghui-blog-admin/secrets/de
 
 把 Key 写入该文件后，不要提交该文件，也不要让 Next.js 客户端读取它。
 
-## 6. 访问量为什么不会一次刷新加两次
+## 6. 配置自有账号评论
+
+评论不依赖 GitHub Issue。FastAPI 使用 SQLite 保存站点账号、会话和评论；访客可以用用户名、邮箱和密码注册。密码通过 scrypt 强哈希保存，会话 Cookie 为 HttpOnly，并对写操作执行 CSRF 校验和频率限制。
+
+生产环境至少设置：
+
+```bash
+XINGHUI_BLOG_COMMENT_DB=/var/lib/xinghui-blog-admin/comments.sqlite3
+XINGHUI_BLOG_COMMENT_OAUTH_CONFIG=/var/lib/xinghui-blog-admin/comments-oauth.json
+COMMENT_COOKIE_DOMAIN=example.com
+COMMENT_ALLOWED_HOSTS=blog.example.com,admin.example.com
+```
+
+GitHub 是可选的推荐快捷登录方式。在 GitHub 创建 OAuth App，将回调地址设为 `https://blog.example.com/api/comments/auth/github/callback`，再到管理后台“评论系统配置”填写 Client ID、Client Secret 和博主 GitHub 用户名。Secret 只写入服务器 600 权限私有文件，不进入 `siteConfig.ts` 或 Git。
+
+## 7. 访问量为什么不会一次刷新加两次
 
 主页加载时会生成一个只在当前文档生命周期存在的随机 `pageViewId`。如果 React 初始化阶段重复挂载组件，两次请求携带相同 ID，服务端只增加一次；浏览器真正刷新后会生成新 ID，因此刷新仍增加一次。ID 会哈希后短期保存，不包含 IP、账号或设备标识。
 
-## 7. 音乐链路
+## 8. 音乐链路
 
 主站只调用自己的 `/api/music`、`/api/music/stream` 和 `/api/music/lyric`。这些 Next.js Route Handler 再代理到 FastAPI，浏览器不会直接获得后台 Cookie。
 
 可选的 QQ 登录助手源码位于 `apps/admin/tools/qq-login-helper`。使用前把配对地址改成自己的管理域名并重新打包。登录凭据只应保存在服务器私有目录；不要上传 Cookie，也不要用该功能绕过平台授权或向第三方共享会员能力。
 
-## 8. 从管理端直接发布
+## 9. 从管理端直接发布
 
 服务器发布流程是：
 
@@ -111,7 +126,7 @@ sudo install -m 600 -o blog -g blog /dev/null /srv/xinghui-blog-admin/secrets/de
 
 管理页面通过 SSE 读取构建状态；后端中间件在构建期间拒绝写操作，因此即使浏览器刷新，也不会破坏正在构建的文件。
 
-## 9. GitHub 的正确用途
+## 10. GitHub 的正确用途
 
 服务器本地发布不依赖 GitHub。GitHub 更适合作为模板、代码审查和私有备份：
 
@@ -119,7 +134,7 @@ sudo install -m 600 -o blog -g blog /dev/null /srv/xinghui-blog-admin/secrets/de
 - 个性化文章、真实域名和密钥使用私有仓库或服务器快照；
 - 发布前运行 `docs/SECURITY.md` 中的扫描命令。
 
-## 10. 上线前检查
+## 11. 上线前检查
 
 ```bash
 npm run build:web

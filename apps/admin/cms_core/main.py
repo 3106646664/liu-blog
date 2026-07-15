@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # 引入所有 API 路由
-from cms_core.api import music, music_pair, config, picbed, drafts, moments
+from cms_core.api import music, music_pair, config, picbed, drafts, moments, comments
 from cms_core.api import gallery, friends, projects
 from cms_core.api import sync, deploy
 
@@ -19,6 +19,7 @@ async def block_writes_while_publishing(request, call_next):
     if (
         request.method in {"POST", "PUT", "PATCH", "DELETE"}
         and request.url.path not in status_paths
+        and not request.url.path.startswith("/api/comments")
         and deploy.is_deploy_busy()
     ):
         state = deploy.load_deploy_state()
@@ -67,3 +68,4 @@ app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(moments.router, prefix="/api/moments", tags=["Moments"])
 app.include_router(sync.router, prefix="/api/sync", tags=["Sync"])
 app.include_router(deploy.router, prefix="/api/deploy", tags=["Deploy"])
+app.include_router(comments.router, prefix="/api/comments", tags=["Comments"])

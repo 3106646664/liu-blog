@@ -25,6 +25,8 @@ apps/admin/data/music-pair-sessions.json
 apps/admin/data/deploy-state.json
 apps/admin/data/drafts.json
 apps/admin/data/cookies.json
+apps/admin/data/comments.sqlite3*
+apps/admin/data/.comments-oauth.json
 *.pem
 *.key
 *.p12

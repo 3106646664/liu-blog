@@ -34,6 +34,79 @@ def read_deepseek_key():
         return ""
 
 
+def get_comment_oauth_path():
+    override = os.getenv("XINGHUI_BLOG_COMMENT_OAUTH_CONFIG", "").strip()
+    if override:
+        return os.path.abspath(os.path.expandvars(override))
+    if os.name != "nt" and os.path.isdir("/var/lib/xinghui-blog-admin"):
+        return "/var/lib/xinghui-blog-admin/comments-oauth.json"
+    return os.path.join(PROJECT_ROOT, "data", ".comments-oauth.json")
+
+
+def read_comment_oauth():
+    try:
+        with open(get_comment_oauth_path(), "r", encoding="utf-8") as config_file:
+            data = json.load(config_file)
+            return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+@router.get("/comment-oauth")
+def get_comment_oauth():
+    data = read_comment_oauth()
+    callback_url = str(data.get("callback_url") or os.getenv("COMMENT_GITHUB_CALLBACK_URL", "https://blog.example.com/api/comments/auth/github/callback"))
+    return {
+        "success": True,
+        "configured": bool(data.get("client_id") and data.get("client_secret")),
+        "clientId": str(data.get("client_id") or ""),
+        "callbackUrl": callback_url,
+        "adminGithubLogins": data.get("admin_github_logins") or [],
+    }
+
+
+@router.post("/comment-oauth")
+def save_comment_oauth(payload: Dict[str, Any] = Body(...)):
+    existing = read_comment_oauth()
+    client_id = str(payload.get("clientId") or "").strip()
+    client_secret = str(payload.get("clientSecret") or "").strip() or str(existing.get("client_secret") or "")
+    callback_url = str(payload.get("callbackUrl") or existing.get("callback_url") or "").strip()
+    admin_logins = payload.get("adminGithubLogins") or []
+    if isinstance(admin_logins, str):
+        admin_logins = [item.strip() for item in admin_logins.split(",") if item.strip()]
+    if not (10 <= len(client_id) <= 128) or any(char.isspace() for char in client_id):
+        return {"success": False, "message": "GitHub Client ID 格式无效"}
+    if not (20 <= len(client_secret) <= 256) or any(char.isspace() for char in client_secret):
+        return {"success": False, "message": "请填写有效的 Client Secret；已保存过时可留空"}
+    if not callback_url.startswith("https://") or len(callback_url) > 512:
+        return {"success": False, "message": "回调地址必须是有效的 HTTPS URL"}
+    if not isinstance(admin_logins, list) or len(admin_logins) > 20:
+        return {"success": False, "message": "GitHub 管理员列表格式无效"}
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "callback_url": callback_url,
+        "admin_github_logins": [str(item).strip()[:64] for item in admin_logins if str(item).strip()],
+    }
+    path = get_comment_oauth_path()
+    temp_path = f"{path}.tmp-{os.getpid()}"
+    try:
+        os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+        fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as config_file:
+            json.dump(data, config_file, ensure_ascii=False, indent=2)
+            config_file.flush()
+            os.fsync(config_file.fileno())
+        os.replace(temp_path, path)
+        if os.name != "nt":
+            os.chmod(path, 0o600)
+        return {"success": True, "configured": True, "message": "GitHub 登录配置已安全保存并立即生效"}
+    except OSError as error:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return {"success": False, "message": f"保存失败: {error}"}
+
+
 def get_config_path():
     possible_paths = [
         os.path.join(PROJECT_ROOT, 'siteConfig.ts'),
@@ -126,7 +199,7 @@ def get_site_config():
         root_content = content
 
         # 1. 🌟 预先提取并隔离所有已知的“嵌套对象”，防止内部属性泄露到外层！
-        known_dicts = ['social', 'gitalkConfig', 'geminiConfig', 'icpConfig']
+        known_dicts = ['social', 'geminiConfig', 'icpConfig']
         for dict_name in known_dicts:
             dict_match = re.search(rf'{dict_name}\s*:\s*\{{([\s\S]+?)\}}', content)
             if dict_match:
@@ -219,7 +292,7 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
         "bgImages", "backgroundMode", "scrollBackgroundImages", "scrollBackgroundDuration",
         "defaultPostCover", "photoWallImage", "cloudMusicIds", "social",
         "counts", "chatterTitle", "chatterDescription", "picBedName", "picBedUrl",
-        "picBedToken", "danmakuList", "gitalkConfig", "buildDate", "footerBadges",
+        "picBedToken", "danmakuList", "buildDate", "footerBadges",
         "icpConfig", "geminiConfig",
         "faviconUrl",
         "navTitle",

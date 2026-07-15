@@ -46,6 +46,7 @@ flowchart LR
 | 模块 | 职责 |
 | --- | --- |
 | `config.py` | 读取和白名单更新 `siteConfig.ts`，单独保存 DeepSeek Key |
+| `comments.py` | 自有账号注册、scrypt 密码哈希、GitHub OAuth、会话与 SQLite 评论数据 |
 | `drafts.py` | 草稿创建、读取、删除与发布准备 |
 | `gallery.py` | 相册数据落盘 |
 | `friends.py` | 友链数据落盘 |

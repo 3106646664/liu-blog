@@ -85,3 +85,7 @@ python -m compileall -q apps/admin/cms_core
 ## 许可证与署名
 
 本仓库保留上游项目署名，并使用 CC BY-NC 4.0。详情见 [LICENSE](LICENSE)。
+
+## 评论账号系统
+
+模板内置第一方账号与评论服务：访客可以使用用户名、邮箱和密码注册，也可以配置 GitHub OAuth 作为推荐快捷登录。评论保存在服务器 SQLite 数据库，不依赖 GitHub Issue。密码使用 scrypt 强哈希，会话采用 HttpOnly Cookie、CSRF 校验和请求频率限制。完整配置见 [TUTORIAL.md](TUTORIAL.md#6-配置自有账号评论)。
