@@ -76,6 +76,10 @@ def _db() -> Iterator[sqlite3.Connection]:
         connection.commit()
     finally:
         connection.close()
+        if os.name != "nt":
+            for candidate in (path, Path(f"{path}-wal"), Path(f"{path}-shm")):
+                if candidate.exists():
+                    os.chmod(candidate, 0o600)
 
 
 def init_comments_database() -> None:
