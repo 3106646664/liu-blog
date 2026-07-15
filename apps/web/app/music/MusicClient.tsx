@@ -10,63 +10,69 @@ import Comments from '../../components/Comments';
 
 export default function MusicClient() {
   const {
-    playlist, currentSong, isPlaying, progress, currentTime, duration, currentLyric,
+    playlist, currentSong, isPlaying, progress, currentTime, duration, currentLyric, lyrics,
     isLoading, togglePlay, nextSong, prevSong, handleSeek,
-    playSong, selectSong,
+    playSong, replaceQueue,
     playMode, togglePlayMode,
     volume, setVolume, isMuted, toggleMute
   } = useMusic();
 
   const lyricContainerRef = useRef<HTMLDivElement>(null);
   const activeLyricRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'lyrics' | 'playlist'>('lyrics');
+  const [activeTab, setActiveTab] = useState<'lyrics' | 'queue' | 'playlists'>('lyrics');
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
-  const [parsedLyrics, setParsedLyrics] = useState<any[]>([]);
+  const parsedLyrics = lyrics;
+  const [accountPlaylists, setAccountPlaylists] = useState<any[]>([]);
+  const [accountLoggedIn, setAccountLoggedIn] = useState<boolean | null>(null);
+  const [playlistsLoaded, setPlaylistsLoaded] = useState(false);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<any | null>(null);
+  const [playlistTracks, setPlaylistTracks] = useState<any[]>([]);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [playlistError, setPlaylistError] = useState('');
 
   useEffect(() => {
-    if (!currentSong) {
-      setParsedLyrics([]);
-      return;
+    if (activeTab !== 'playlists' || playlistsLoaded) return;
+    let cancelled = false;
+    setPlaylistLoading(true);
+    setPlaylistError('');
+    fetch('/api/music/playlists', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.detail || '账号歌单读取失败');
+        if (!cancelled) {
+          setAccountLoggedIn(Boolean(payload.logged_in));
+          setAccountPlaylists(Array.isArray(payload.data) ? payload.data : []);
+          setPlaylistsLoaded(true);
+        }
+      })
+      .catch((reason) => { if (!cancelled) setPlaylistError(reason instanceof Error ? reason.message : '账号歌单读取失败'); })
+      .finally(() => { if (!cancelled) setPlaylistLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, playlistsLoaded]);
+
+  const openAccountPlaylist = async (item: any) => {
+    setSelectedPlaylist(item);
+    setPlaylistTracks([]);
+    setPlaylistLoading(true);
+    setPlaylistError('');
+    try {
+      const response = await fetch(`/api/music/playlists/${encodeURIComponent(item.id)}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload.detail || '歌单歌曲读取失败');
+      setPlaylistTracks(Array.isArray(payload.data) ? payload.data : []);
+    } catch (reason) {
+      setPlaylistError(reason instanceof Error ? reason.message : '歌单歌曲读取失败');
+    } finally {
+      setPlaylistLoading(false);
     }
+  };
 
-    const rawLrc = currentSong.lrc || currentSong.lyric || (typeof currentSong.lyrics === 'string' ? currentSong.lyrics : '');
-
-    if (Array.isArray(currentSong.lyrics) && currentSong.lyrics.length > 0) {
-      setParsedLyrics(currentSong.lyrics);
-      return;
-    }
-
-    if (!rawLrc || typeof rawLrc !== 'string') {
-      setParsedLyrics([]);
-      return;
-    }
-
-    const lines = rawLrc.split('\n');
-    const parsed = [];
-    const timeExp = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
-    let hasValidTime = false;
-
-    for (const line of lines) {
-      const text = line.replace(/\[\d{2,}:\d{2}(?:[.:]\d{2,3})?\]/g, '').trim();
-      if (!text) continue;
-
-      let match;
-      while ((match = timeExp.exec(line)) !== null) {
-        hasValidTime = true;
-        const min = parseInt(match[1], 10);
-        const sec = parseInt(match[2], 10);
-        const ms = match[3] ? parseFloat(`0.${match[3]}`) : 0;
-        parsed.push({ time: min * 60 + sec + ms, text });
-      }
-    }
-
-    if (hasValidTime) {
-      setParsedLyrics(parsed.sort((a, b) => a.time - b.time));
-    } else {
-      setParsedLyrics(lines.map(l => ({ time: -1, text: l.trim() })).filter(l => l.text));
-    }
-  }, [currentSong?.id, currentSong?.lyric, currentSong?.lrc, currentSong?.lyrics]);
+  const playAccountPlaylist = (startIndex = 0) => {
+    if (!playlistTracks.length) return;
+    replaceQueue(playlistTracks, startIndex);
+    setActiveTab('queue');
+  };
 
   const activeLyricIndex = useMemo(() => {
     if (!parsedLyrics.length) return -1;
@@ -101,8 +107,7 @@ export default function MusicClient() {
   };
 
   const handlePlaySong = (index: number) => {
-    if (typeof playSong === 'function') playSong(index);
-    else if (typeof selectSong === 'function') selectSong(index);
+    playSong(index);
   };
 
   if (isLoading || !currentSong) {
@@ -188,25 +193,26 @@ export default function MusicClient() {
 
             {/* ====== 右侧/底部：歌词与歌单面板 ====== */}
             <div className="md:col-span-7 flex flex-col bg-white/40 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 rounded-[32px] shadow-2xl relative transition-colors duration-700 overflow-hidden h-[450px] md:h-auto shrink-0">
-              <div className="flex items-center justify-center gap-1 p-1 mt-4 md:mt-6 mx-auto bg-white/50 dark:bg-slate-900/50 rounded-full shadow-inner border border-white/40 w-48 md:w-64 z-20 shrink-0">
+              <div className="flex items-center justify-center gap-1 p-1 mt-4 md:mt-6 mx-auto bg-white/50 dark:bg-slate-900/50 rounded-full shadow-inner border border-white/40 w-72 md:w-96 z-20 shrink-0">
                 <button onClick={() => setActiveTab('lyrics')} className={`flex-1 py-1.5 md:py-2 rounded-full font-black text-xs md:text-[13px] transition-all ${activeTab === 'lyrics' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>歌词</button>
-                <button onClick={() => setActiveTab('playlist')} className={`flex-1 py-1.5 md:py-2 rounded-full font-black text-xs md:text-[13px] transition-all ${activeTab === 'playlist' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>歌单</button>
+                <button onClick={() => setActiveTab('queue')} className={`flex-1 py-1.5 md:py-2 rounded-full font-black text-xs md:text-[13px] transition-all ${activeTab === 'queue' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>当前播放队列</button>
+                <button onClick={() => setActiveTab('playlists')} className={`flex-1 py-1.5 md:py-2 rounded-full font-black text-xs md:text-[13px] transition-all ${activeTab === 'playlists' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>歌单</button>
               </div>
 
               <div className="flex-1 relative mt-2 flex flex-col overflow-hidden">
                 {activeTab === 'lyrics' && (
                   <div className="absolute inset-0 flex flex-col h-full animate-in fade-in duration-300">
-                    <div className="absolute top-0 left-0 right-0 h-32 md:h-40 bg-gradient-to-b from-white/40 dark:from-slate-800/60 to-transparent z-10 pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 right-0 h-32 md:h-40 bg-gradient-to-t from-white/40 dark:from-slate-800/60 to-transparent z-10 pointer-events-none" />
+                    <div className="absolute top-0 left-0 right-0 h-10 md:h-12 bg-gradient-to-b from-white/40 dark:from-slate-800/60 to-transparent z-10 pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 h-10 md:h-12 bg-gradient-to-t from-white/40 dark:from-slate-800/60 to-transparent z-10 pointer-events-none" />
                     <div ref={lyricContainerRef} className="h-full overflow-y-auto no-scrollbar scroll-smooth relative px-4 md:px-6 lyric-mask-container">
-                        <div className="py-[30vh] md:py-[35vh] flex flex-col gap-4 md:gap-6 text-center lg:px-10">
+                        <div className="py-20 md:py-28 flex flex-col gap-3 md:gap-4 text-center lg:px-10">
                             {parsedLyrics.length > 0 ? (
                               parsedLyrics.map((line: any, index: number) => {
                                 const isActive = index === activeLyricIndex;
                                 return (
                                   <div key={index} ref={isActive ? activeLyricRef : null}
-                                    className={`transition-all duration-700 cursor-pointer px-2 md:px-4 rounded-2xl ${isActive ? 'opacity-100 scale-105 py-2 md:py-3 bg-white/10' : 'opacity-20 hover:opacity-40'}`}
-                                    onClick={() => duration > 0 && handleSeek({ target: { value: String((line.time / duration) * 100) } } as any)}
+                                    className={`transition-all duration-500 cursor-pointer px-2 md:px-4 rounded-2xl ${isActive ? 'opacity-100 scale-[1.03] py-2 md:py-3 bg-white/20 shadow-sm' : 'opacity-65 hover:opacity-100'}`}
+                                    onClick={() => duration > 0 && line.time >= 0 && handleSeek({ target: { value: String((line.time / duration) * 100) } } as any)}
                                   >
                                     <p className={`font-black tracking-tight leading-relaxed transition-all duration-700 ${isActive ? 'text-lg md:text-2xl text-indigo-600 dark:text-indigo-400' : 'text-sm md:text-lg text-slate-700 dark:text-slate-300'}`} style={isActive ? { textShadow: '0 0 20px rgba(99,102,241,0.15)' } : {}}>{line.text}</p>
                                   </div>
@@ -224,7 +230,7 @@ export default function MusicClient() {
                     </div>
                   </div>
                 )}
-                {activeTab === 'playlist' && (
+                {activeTab === 'queue' && (
                   <div className="absolute inset-0 px-4 md:px-8 pb-4 md:pb-8 pt-2 md:pt-4 animate-in fade-in duration-300 flex flex-col">
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2 md:gap-2.5">
                       <AnimatePresence mode='popLayout'>
@@ -245,6 +251,45 @@ export default function MusicClient() {
                         })}
                       </AnimatePresence>
                     </div>
+                  </div>
+                )}
+                {activeTab === 'playlists' && (
+                  <div className="absolute inset-0 px-4 md:px-8 pb-5 pt-3 animate-in fade-in duration-300 flex flex-col overflow-hidden">
+                    {selectedPlaylist ? (
+                      <>
+                        <div className="mb-3 flex items-center justify-between gap-3 shrink-0">
+                          <button onClick={() => { setSelectedPlaylist(null); setPlaylistTracks([]); setPlaylistError(''); }} className="text-xs font-black text-indigo-500 hover:text-indigo-600">← 返回歌单</button>
+                          <div className="min-w-0 flex-1 text-center"><h3 className="truncate text-sm font-black text-slate-800 dark:text-white">{selectedPlaylist.name}</h3><p className="text-[10px] text-slate-400">{playlistTracks.length || selectedPlaylist.track_count || 0} 首歌曲</p></div>
+                          <button onClick={() => playAccountPlaylist(0)} disabled={!playlistTracks.length} className="rounded-xl bg-indigo-500 px-3 py-2 text-xs font-black text-white disabled:opacity-40">播放全部</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                          {playlistLoading && <div className="flex h-full items-center justify-center gap-2 text-sm font-bold text-slate-400"><RefreshCcw size={16} className="animate-spin" />正在读取歌单…</div>}
+                          {!playlistLoading && playlistError && <div className="rounded-2xl bg-rose-500/10 p-4 text-center text-sm text-rose-500">{playlistError}</div>}
+                          {!playlistLoading && !playlistError && playlistTracks.length === 0 && <div className="py-12 text-center text-sm text-slate-400">这个歌单暂时没有可播放歌曲</div>}
+                          {!playlistLoading && playlistTracks.map((song: any, index: number) => (
+                            <button key={`${song.id}-${index}`} onClick={() => playAccountPlaylist(index)} className="flex w-full items-center gap-3 rounded-2xl border border-transparent p-3 text-left transition hover:border-indigo-500/20 hover:bg-white/40 dark:hover:bg-slate-700/40">
+                              <span className="w-6 shrink-0 text-center text-xs font-bold text-slate-400">{index + 1}</span>
+                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-indigo-500/10">{song.cover ? <img src={song.cover} alt="" className="h-full w-full object-cover" /> : <Disc3 className="m-2.5 text-indigo-400" size={20} />}</div>
+                              <div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-800 dark:text-slate-200">{song.title || song.name}</p><p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{song.artist || song.author}</p></div>
+                              <Play size={15} className="shrink-0 text-indigo-500" />
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                        {playlistLoading && <div className="flex h-full items-center justify-center gap-2 text-sm font-bold text-slate-400"><RefreshCcw size={16} className="animate-spin" />正在读取账号歌单…</div>}
+                        {!playlistLoading && playlistError && <div className="rounded-2xl bg-rose-500/10 p-4 text-center text-sm text-rose-500">{playlistError}</div>}
+                        {!playlistLoading && accountLoggedIn === false && <div className="py-12 text-center"><Disc3 className="mx-auto mb-3 text-slate-300" size={38} /><p className="text-sm font-black text-slate-500">QQ 音乐账号尚未登录</p><p className="mt-1 text-xs text-slate-400">请先在管理后台完成 QQ 音乐登录</p></div>}
+                        {!playlistLoading && accountLoggedIn && accountPlaylists.length === 0 && <div className="py-12 text-center text-sm text-slate-400">账号下暂时没有歌单</div>}
+                        {!playlistLoading && accountLoggedIn && accountPlaylists.length > 0 && <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{accountPlaylists.map((item: any) => (
+                          <button key={item.id} onClick={() => openAccountPlaylist(item)} className="flex items-center gap-3 rounded-2xl border border-white/40 bg-white/30 p-3 text-left transition hover:-translate-y-0.5 hover:border-indigo-500/30 hover:bg-white/55 dark:border-slate-700/40 dark:bg-slate-900/20 dark:hover:bg-slate-700/50">
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-indigo-500/10">{item.cover && /^https?:/.test(item.cover) ? <img src={item.cover} alt="" className="h-full w-full object-cover" /> : <ListMusic className="m-3 text-indigo-400" size={24} />}</div>
+                            <div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-slate-800 dark:text-slate-200">{item.name}</p><p className="truncate text-[10px] text-slate-400">{item.track_count || 0} 首 · {item.creator || 'QQ 音乐'}</p></div>
+                          </button>
+                        ))}</div>}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -270,8 +315,8 @@ export default function MusicClient() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .lyric-mask-container {
-          -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
-          mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+          -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
         }
       `}</style>
     </div>

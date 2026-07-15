@@ -401,6 +401,23 @@ async def account_playlists():
     }
 
 
+@router.get("/account/playlists/{playlist_id}/tracks")
+async def account_playlist_tracks(playlist_id: str):
+    if not re.fullmatch(r"[A-Za-z0-9:_-]+", playlist_id):
+        raise HTTPException(status_code=400, detail="无效的 QQ 音乐歌单 ID")
+    status = _login_status()
+    if not status["logged_in"]:
+        raise HTTPException(status_code=401, detail="QQ 音乐账号尚未登录")
+    data = await _engine_json("GET", "/api/v1/playlist/user", params={"source": "qq", "page": 1, "limit": 100})
+    raw_playlists = data.get("playlists") if isinstance(data, dict) else []
+    playlists = [_normalize_playlist(item) for item in (raw_playlists or []) if isinstance(item, dict)]
+    selected = next((item for item in playlists if item["id"] == playlist_id), None)
+    if not selected:
+        raise HTTPException(status_code=404, detail="该歌单不属于当前登录账号或已被删除")
+    tracks = await _playlist_tracks(playlist_id)
+    return {"success": True, "source": "qq", "playlist": selected, "data": tracks}
+
+
 @router.get("/search")
 async def search_music(
     query: str = Query(min_length=1, max_length=100),

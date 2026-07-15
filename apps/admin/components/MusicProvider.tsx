@@ -48,6 +48,7 @@ interface MusicContextType {
   currentTime: number;
   duration: number;
   currentLyric: string;
+  lyrics: { time: number; text: string }[];
   isLoading: boolean;
   volume: number;
   isMuted: boolean;
@@ -58,6 +59,7 @@ interface MusicContextType {
   prevSong: () => void;
   handleSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   playSong: (index: number) => void;
+  replaceQueue: (songs: any[], startIndex?: number) => void;
   setVolume: (value: number) => void;
   toggleMute: () => void;
   togglePlayMode: () => void;
@@ -170,10 +172,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     return () => { isMounted = false; };
   }, []);
 
+  const currentSong = playlist[currentIndex];
+
   useEffect(() => {
-    if (playlist.length === 0) return;
+    if (playlist.length === 0 || !currentSong) return;
     let isMounted = true;
-    const currentSong = playlist[currentIndex];
     setLyrics([]);
     setCurrentLyric("♪ 正在缓冲 ♪");
     if (currentSong.lyrics && currentSong.lyrics.length > 0) {
@@ -207,7 +210,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
     }
     return () => { isMounted = false; };
-  }, [currentIndex, playlist.length]); // 移除 playlist 依赖防止无限循环，只依赖长度
+  }, [currentSong?.id, currentSong?.lrcUrl]);
 
   // 🌟 4. 同步音量到 audio 元素
   useEffect(() => {
@@ -243,8 +246,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   // 🌟 6. 暴露直接播放指定歌曲的方法
   const playSong = (index: number) => {
+    if (index < 0 || index >= playlist.length) return;
     setCurrentIndex(index);
     if (!isPlaying) setIsPlaying(true); // 保证切歌后自动播放
+  };
+
+  const replaceQueue = (songs: any[], startIndex = 0) => {
+    const nextQueue = normalizePlaylist(Array.isArray(songs) ? songs : []);
+    if (nextQueue.length === 0) return;
+    const safeIndex = Math.min(Math.max(0, startIndex), nextQueue.length - 1);
+    setLyrics([]);
+    setCurrentTime(0);
+    setProgress(0);
+    setPlaylist(nextQueue);
+    setCurrentIndex(safeIndex);
+    setIsPlaying(true);
+    try {
+      window.localStorage.setItem(MUSIC_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), playlist: nextQueue }));
+    } catch {
+      /* 当前播放队列仍保留在内存中。 */
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -296,14 +317,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const currentSong = playlist[currentIndex];
-
   return (
     <MusicContext.Provider value={{
-        playlist, currentIndex, currentSong, isPlaying, progress, currentTime, duration, currentLyric, isLoading,
+        playlist, currentIndex, currentSong, isPlaying, progress, currentTime, duration, currentLyric, lyrics, isLoading,
         volume, isMuted, playMode, // 暴露新状态
         togglePlay, nextSong, prevSong, handleSeek,
-        playSong, setVolume, toggleMute, togglePlayMode // 暴露新方法
+        playSong, replaceQueue, setVolume, toggleMute, togglePlayMode // 暴露新方法
     }}>
       {children}
       {currentSong && (
