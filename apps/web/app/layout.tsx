@@ -124,6 +124,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </div>
             </div>
 
+            <div className="hidden md:block">
+              <CyberCat />
+            </div>
+
             <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
               @keyframes gradientMove { 
                 0% { background-position: 0% 50%; } 
@@ -132,10 +136,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               }
             `}} />
           </MusicProvider>
-
-          <div className="hidden md:block">
-            <CyberCat />
-          </div>
 
         </ThemeProvider>
       </body>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useMusic } from './MusicProvider';
 
 const IDLE_LINES = [
   '今日计划排好了吗？效率可不是靠临时起意。',
@@ -12,13 +13,18 @@ const IDLE_LINES = [
 ];
 
 export default function CyberCat() {
+  const { currentSong, isPlaying } = useMusic();
   const [isPetted, setIsPetted] = useState(false);
+  const [isWaving, setIsWaving] = useState(false);
+  const [isCelebrating, setIsCelebrating] = useState(false);
   const [speech, setSpeech] = useState<string | null>(null);
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const speechTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const petTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousSongIdRef = useRef<string | null>(null);
 
   const speak = (text: string, duration = 6000) => {
     setSpeech(text);
@@ -89,10 +95,34 @@ export default function CyberCat() {
     return () => clearInterval(interval);
   }, [speech, showInput, isThinking]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isPlaying && !isThinking && !isPetted && !showInput && Math.random() > 0.55) {
+        setIsWaving(true);
+        if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+        gestureTimeoutRef.current = setTimeout(() => setIsWaving(false), 1800);
+      }
+    }, 16000);
+    return () => clearInterval(interval);
+  }, [isPlaying, isThinking, isPetted, showInput]);
+
+  useEffect(() => {
+    const songId = currentSong?.id ? String(currentSong.id) : null;
+    if (songId && previousSongIdRef.current && previousSongIdRef.current !== songId) {
+      setIsCelebrating(true);
+      if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+      gestureTimeoutRef.current = setTimeout(() => setIsCelebrating(false), 1500);
+    }
+    previousSongIdRef.current = songId;
+  }, [currentSong?.id]);
+
   useEffect(() => () => {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
     if (petTimeoutRef.current) clearTimeout(petTimeoutRef.current);
+    if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
   }, []);
+
+  const petActionClass = isThinking ? 'assistant-thinking assistant-thinking-body' : isPlaying ? 'assistant-dance assistant-dance-body' : isCelebrating || isPetted ? 'assistant-happy assistant-hop-body' : isWaving ? 'assistant-happy assistant-wave-body' : 'assistant-idle assistant-idle-body';
 
   return (
     <motion.div
@@ -120,6 +150,13 @@ export default function CyberCat() {
       </div>
 
       <div className="relative">
+        <AnimatePresence>
+          {isPlaying && (
+            <motion.div key="music-notes" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }} className="assistant-music-notes pointer-events-none absolute -top-10 left-1/2 z-30 h-14 w-24 -translate-x-1/2" aria-hidden="true">
+              <span className="assistant-note assistant-note-one">♪</span><span className="assistant-note assistant-note-two">♫</span><span className="assistant-note assistant-note-three">♬</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
           <button
             onClick={(event) => {
@@ -164,13 +201,30 @@ export default function CyberCat() {
             .assistant-idle { animation: assistant-frames 1.4s infinite; background-position-y: 0%; }
             .assistant-happy { animation: assistant-frames 0.9s infinite; background-position-y: 50%; }
             .assistant-thinking { animation: assistant-frames 1.1s infinite; background-position-y: 100%; }
+            .assistant-dance { animation: assistant-frames 0.48s infinite; background-position-y: 50%; }
+            .assistant-idle-body { animation: assistant-frames 1.4s infinite, assistant-breathe 2.8s ease-in-out infinite; transform-origin: 50% 90%; }
+            .assistant-hop-body { animation: assistant-frames .9s infinite, assistant-hop 0.52s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+            .assistant-thinking-body { animation: assistant-frames 1.1s infinite, assistant-think 1.1s ease-in-out infinite; transform-origin: 50% 82%; }
+            .assistant-wave-body { animation: assistant-frames .9s infinite, assistant-wave 0.65s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+            .assistant-dance-body { animation: assistant-frames .48s infinite, assistant-dance-body 0.62s ease-in-out infinite; transform-origin: 50% 92%; }
+            .assistant-note { position: absolute; color: #a855f7; font-weight: 900; line-height: 1; text-shadow: 0 2px 0 rgba(255,255,255,.9), 0 0 10px rgba(168,85,247,.65); }
+            .assistant-note-one { left: 9px; bottom: 2px; font-size: 24px; animation: assistant-note-rise 1.25s ease-out infinite; }
+            .assistant-note-two { left: 40px; bottom: 12px; font-size: 28px; animation: assistant-note-rise 1.25s .36s ease-out infinite; }
+            .assistant-note-three { right: 5px; bottom: 0; font-size: 21px; animation: assistant-note-rise 1.25s .72s ease-out infinite; }
             @keyframes assistant-frames {
               0%, 33.32% { background-position-x: 0%; }
               33.33%, 66.65% { background-position-x: 50%; }
               66.66%, 100% { background-position-x: 100%; }
             }
+            @keyframes assistant-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.015); } }
+            @keyframes assistant-hop { from { transform: translateY(0) scale(1); } to { transform: translateY(-7px) scale(1.03); } }
+            @keyframes assistant-think { 0%, 100% { transform: rotate(-2deg) translateY(0); } 50% { transform: rotate(3deg) translateY(-2px); } }
+            @keyframes assistant-wave { from { transform: rotate(-4deg) translateX(-2px); } to { transform: rotate(5deg) translateX(2px); } }
+            @keyframes assistant-dance-body { 0%, 100% { transform: translateY(0) rotate(-5deg) scale(1); } 25% { transform: translateY(-8px) rotate(0deg) scale(1.025); } 50% { transform: translateY(0) rotate(5deg) scale(1); } 75% { transform: translateY(-5px) rotate(0deg) scale(1.02); } }
+            @keyframes assistant-note-rise { 0% { opacity: 0; transform: translateY(8px) rotate(-8deg) scale(.75); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-30px) rotate(10deg) scale(1.15); } }
+            @media (prefers-reduced-motion: reduce) { .assistant-idle-body, .assistant-hop-body, .assistant-thinking-body, .assistant-wave-body, .assistant-dance-body, .assistant-note { animation-duration: 2.4s !important; } }
           `}</style>
-          <span className={`block assistant-sprite drop-shadow-2xl ${isPetted ? 'assistant-happy' : isThinking ? 'assistant-thinking' : 'assistant-idle'}`} />
+          <span className={`block assistant-sprite drop-shadow-2xl ${petActionClass}`} />
         </button>
       </div>
 

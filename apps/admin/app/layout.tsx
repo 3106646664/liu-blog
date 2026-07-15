@@ -110,6 +110,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <ClickEffect />
                 </div>
 
+                <CyberCat />
+
                 <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
                   @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
                   body.winter-mode .bg-effects-wrapper { opacity: 0 !important; visibility: hidden; }
@@ -132,7 +134,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </ToastProvider>
           </OperationProvider>
         </ThemeProvider>
-        <CyberCat />
       </body>
     </html>
   );
