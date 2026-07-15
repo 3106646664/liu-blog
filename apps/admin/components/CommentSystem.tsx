@@ -41,7 +41,6 @@ function Avatar({ user, small = false }: { user: CommentUser; small?: boolean })
     </span>
   );
 }
-
 export default function CommentSystem({ pageKey, compact = false }: { pageKey: string; compact?: boolean }) {
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [user, setUser] = useState<CommentUser | null>(null);
@@ -227,4 +226,3 @@ export default function CommentSystem({ pageKey, compact = false }: { pageKey: s
     </section>
   );
 }
-

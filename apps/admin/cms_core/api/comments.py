@@ -569,4 +569,3 @@ def delete_comment(
 
 
 init_comments_database()
-
